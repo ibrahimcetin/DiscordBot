@@ -1,3 +1,4 @@
+import asyncio
 import random
 import json
 import time
@@ -204,12 +205,13 @@ async def ban_user(ctx):
 
 @bot.command(name="sil")
 async def delete_messages(ctx, arg):
-    messages = []
-    async for msg in ctx.channel.history(limit=int(arg)):
-        messages.append(msg)
+    messages = await ctx.channel.history(limit=int(arg)).flatten()
 
     await ctx.channel.delete_messages(messages)
-    await ctx.send(f"{len(messages)} mesaj silindi!")
+    msg = await ctx.send(f"{len(messages)} mesaj silindi!")
+
+    await asyncio.sleep(3)
+    await msg.delete()
 
 
 token = "token"
