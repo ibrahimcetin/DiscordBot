@@ -24,15 +24,23 @@ Yardım mesajı"""
         await self.send(embed=embed)
 
     async def sendUserInfo(self, user):
-        embed = discord.Embed(title=f"**{user.name}** Üye Bilgisi", color=0x6675ff)
+        embed = discord.Embed(title=f"**{user.name}** Üye Bilgisi", color=0x6675FF)
         embed.set_footer(text=f"Bu havalı kullanıcının ID'si {user.id}")
         embed.set_thumbnail(url=user.avatar_url)
 
         j_date = user.joined_at
-        embed.add_field(name="Sunucuya katılma tarihi", value=f"{j_date.day}/{j_date.month}/{j_date.year}  {j_date.hour}:{j_date.minute}", inline=True)
+        embed.add_field(
+            name="Sunucuya katılma tarihi",
+            value=f"{j_date.day}/{j_date.month}/{j_date.year}  {j_date.hour}:{j_date.minute}",
+            inline=True,
+        )
 
         c_date = user.created_at
-        embed.add_field(name="Hesabını açma tarihi", value=f"{c_date.day}/{c_date.month}/{c_date.year}  {c_date.hour}:{c_date.minute}", inline=True)
+        embed.add_field(
+            name="Hesabını açma tarihi",
+            value=f"{c_date.day}/{c_date.month}/{c_date.year}  {c_date.hour}:{c_date.minute}",
+            inline=True,
+        )
 
         """
         roles = " ".join(user.roles)
@@ -42,7 +50,11 @@ Yardım mesajı"""
         await self.send(embed=embed)
 
     async def sendServerInfo(self):
-        embed = discord.Embed(title="Sunucu Bilgisi", description=f"Bu sunucunun sahibi {self.guild.owner.mention}", color=0xeb4334)
+        embed = discord.Embed(
+            title="Sunucu Bilgisi",
+            description=f"Bu sunucunun sahibi {self.guild.owner.mention}",
+            color=0xEB4334,
+        )
         embed.set_footer(text=f"Sunucu ID'si {self.guild.id}")
         embed.set_thumbnail(url=self.guild.icon_url)
 
@@ -55,17 +67,34 @@ Yardım mesajı"""
         idle = 0
 
         for m in members:
-            if m.bot: bot += 1
-            elif m.status == discord.Status.online: online += 1
-            elif m.status == discord.Status.offline or m.status == discord.Status.invisible: offline += 1
-            elif m.status == discord.Status.idle: idle += 1
-            elif m.status == discord.Status.dnd: dnd += 1
+            if m.bot:
+                bot += 1
+            elif m.status == discord.Status.online:
+                online += 1
+            elif (
+                m.status == discord.Status.offline
+                or m.status == discord.Status.invisible
+            ):
+                offline += 1
+            elif m.status == discord.Status.idle:
+                idle += 1
+            elif m.status == discord.Status.dnd:
+                dnd += 1
 
-        embed.add_field(name=f"__**{self.guild.member_count}** Üye__", value=f":green_circle: **{online}** Çevrimiçi\n:orange_circle: **{idle}** Boşta\n:red_circle: **{dnd}** Meşgul\n:white_circle: **{offline}** Çevrimdışı\n:robot: **{bot}** Bot")
-        embed.add_field(name=f"__**{len(self.guild.channels)}** Kanal__", value=f"Metin: **{len(self.guild.text_channels)}**\nSesli: **{len(self.guild.voice_channels)}**\nKategori: **{len(self.guild.categories)}**")
+        embed.add_field(
+            name=f"__**{self.guild.member_count}** Üye__",
+            value=f":green_circle: **{online}** Çevrimiçi\n:orange_circle: **{idle}** Boşta\n:red_circle: **{dnd}** Meşgul\n:white_circle: **{offline}** Çevrimdışı\n:robot: **{bot}** Bot",
+        )
+        embed.add_field(
+            name=f"__**{len(self.guild.channels)}** Kanal__",
+            value=f"Metin: **{len(self.guild.text_channels)}**\nSesli: **{len(self.guild.voice_channels)}**\nKategori: **{len(self.guild.categories)}**",
+        )
 
         date = self.guild.created_at
-        embed.add_field(name="__Oluşturulma tarihi__", value=f"{date.day}/{date.month}/{date.year}  {date.hour}:{date.minute}")
+        embed.add_field(
+            name="__Oluşturulma tarihi__",
+            value=f"{date.day}/{date.month}/{date.year}  {date.hour}:{date.minute}",
+        )
 
         await self.send(embed=embed)
 
@@ -156,7 +185,9 @@ async def user_avatar(ctx):
 @bot.command(name="üye")
 async def member_info(ctx):
     if len(ctx.message.mentions) != 1:
-        await ctx.send("Üye bilgisi görüntüleyebilmek için bir kişi seçmeniz gerekiyor. `!üye @isim`")
+        await ctx.send(
+            "Üye bilgisi görüntüleyebilmek için bir kişi seçmeniz gerekiyor. `!üye @isim`"
+        )
     else:
         user = ctx.message.mentions[0]
         await ctx.sendUserInfo(user)
@@ -169,7 +200,9 @@ async def server_uptime(ctx):
     _minute, sec = divmod(seconds, 60)
     hour, minute = divmod(_minute, 60)
 
-    await ctx.send(f"Bot {int(hour)} saat, {int(minute)} dakika, {int(sec)} saniyedir açık.")
+    await ctx.send(
+        f"Bot {int(hour)} saat, {int(minute)} dakika, {int(sec)} saniyedir açık."
+    )
 
 
 @bot.command(name="sunucu")
