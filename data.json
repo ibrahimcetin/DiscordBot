@@ -1,0 +1,15 @@
+{
+"Roles": {
+        "role name": "role id (int)"
+    },
+
+"Auto Roles": {
+        "message id (str)": {
+            "emoji name": "role name"
+        },
+
+        "message id (str)": {
+            "emoji name": "role name"
+        }
+    }
+}
