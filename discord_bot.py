@@ -6,16 +6,64 @@ import time
 import discord
 from discord.ext import commands
 
+from restdb import RestDB
+
 
 START = time.time()
+
+JSON_DATA = json.load(open("data.json"))
+
+
+class MyRestDB(RestDB):
+    def __init__(self):
+        super().__init__()
+
+    async def memberInfo(self, member_id):
+        resp_data = await self.getDocument(member_id)
+
+        if resp_data:
+            member_info = {}
+            member_info["member_id"] = resp_data["member_id"]
+            member_info["xp"] = resp_data["xp"]
+            member_info["level"] = resp_data["level"]
+
+            return member_info
+
+        else:
+            return False
+
+    async def newMember(self, member_id: str):
+        data = {"member_id": member_id, "xp": 0, "level": 1}
+        resp_data = await self.newDocument(data)
+
+        return resp_data
+
+
+    async def updateMemberInfo(self, member_id: str, data: dict):
+        resp_data = await self.getDocument(member_id)
+
+        if resp_data:
+            resp = await self.updateDocument(resp_data["_id"], data)
+            return resp
+        else:
+            return False
+
+    async def deleteMember(self, member_id: str):
+        resp_data = await self.getDocument(member_id)
+
+        if resp_data:
+            resp = await self.deleteDocument(resp_data["_id"])
+            return resp
+        else:
+            return False
 
 
 class MyContext(commands.Context):
     async def helpMessage(self):
-        help_text = """
-Yardım mesajı"""
+        help_text = JSON_DATA["help_message"]
 
-        await self.send(f"```diff{help_text}```")
+        await self.send(f"""```diff
+{help_text}```""")
 
     async def sendUserAvatar(self, user):
         embed = discord.Embed(description=f"{user.mention} avatarı", color=0x2F3136)
@@ -23,10 +71,18 @@ Yardım mesajı"""
 
         await self.send(embed=embed)
 
-    async def sendUserInfo(self, user):
-        embed = discord.Embed(title=f"**{user.name}** Üye Bilgisi", color=0x6675FF)
-        embed.set_footer(text=f"Bu havalı kullanıcının ID'si {user.id}")
+    async def sendUserInfo(self, user, requested_by):
+        embed = discord.Embed(title=f"**{user.name}** Üye Bilgisi", description=f"Kullanıcı ID'si | {user.id}", color=0x6675FF)
+        embed.set_footer(text=f"{requested_by.name} tarafından istendi | {requested_by.id}")
         embed.set_thumbnail(url=user.avatar_url)
+
+        roles = [role.mention for role in user.roles if not role.name == '@everyone']
+        roles_text = " ".join(roles) if roles else user.roles[0].name
+        embed.add_field(
+            name="Roller",
+            value=roles_text,
+            inline=False
+        )
 
         j_date = user.joined_at
         embed.add_field(
@@ -41,11 +97,6 @@ Yardım mesajı"""
             value=f"{c_date.day}/{c_date.month}/{c_date.year}  {c_date.hour}:{c_date.minute}",
             inline=True,
         )
-
-        """
-        roles = " ".join(user.roles)
-        embed.add_field(name="Roller", value=roles, inline=False)
-        """
 
         await self.send(embed=embed)
 
@@ -109,53 +160,138 @@ Yardım mesajı"""
                 except:
                     failed.append(m)
 
-        self.send("Duyuru yapıldı!")
+        msj = await self.send("Duyuru yapıldı!")
+        await asyncio.sleep(3)
+        await msj.delete()
 
         if failed:
             print(failed)
 
+    async def sendDatabaseInfo(self):
+        start = time.time()
+        await self.bot.db.getDocument()
+        delay = (time.time() - start) * 1000
+
+        if delay <= 1000:
+            connection_text = ":green_circle: İyi"
+            embed_color = discord.Colour.green()
+        elif 1000 < delay <= 3000:
+            connection_text = ":orange_circle: Normal"
+            embed_color = discord.Colour.orange()
+        else:
+            connection_text = ":red_circle: Kötü"
+            embed_color = discord.Colour.red()
+
+        embed = discord.Embed(
+            title="Veritabanı Bilgisi",
+            color=embed_color,
+        )
+
+        embed.add_field(
+            name="Bağlantı",
+            value=connection_text
+        )
+
+        embed.add_field(
+            name="Cevap Süresi",
+            value=f"{int(delay)}ms"
+        )
+
+        await self.send(embed=embed)
 
 class MyBot(commands.Bot):
     async def on_connect(self):
-        self.json_data = json.load(open("data.json"))
+        self.db = MyRestDB()
+        self.db.connect(
+            url=JSON_DATA["database_url"],
+            api_key=JSON_DATA["database_api_key"]
+        )
 
     async def on_ready(self):
+        self.guild = self.get_guild(JSON_DATA["guild_id"])
+        self.get_roles_from_guild()
+
         print("Her şey hazır!")
 
     async def on_message(self, message):
-        await self.process_commands(message)
+        if message.author.bot:
+            pass
+
+        elif message.content.startswith("!"):
+            await self.process_commands(message)
+
+        else:
+            member_id = str(message.author.id)
+            member_info = await self.db.memberInfo(member_id)
+
+            if member_info:
+                member_xp = member_info["xp"]
+                member_level = member_info["level"]
+
+                message_len = len(message.content.replace(" ", ""))
+                _message_xp = message_len // 20
+                message_xp = 1 if _message_xp <= 0 else _message_xp
+
+                member_xp += message_xp
+                level_max_xp = 50*(2**member_level)
+
+                if (member_xp > level_max_xp) and (role := self.roles.get(f"Level {member_level+1}", False)):
+                    member_xp -= level_max_xp
+
+                    await message.author.remove_roles(self.roles[f"Level {member_level}"])
+                    member_level += 1
+                    await message.author.add_roles()
+                    await message.channel.send(JSON_DATA["level_up_message"].format(name=message.author.mention, level=member_level))
+
+                elif (member_xp > level_max_xp) and not (role := self.roles.get(f"Level {member_level+1}", False)):
+                    member_xp = level_max_xp
+
+                await self.db.updateMemberInfo(member_id, {"xp": member_xp, "level": member_level})
+
+            else:
+                if success := await self.db.newMember(member_id):
+                    await message.author.add_roles(self.roles["Level 1"])
+                    await message.author.send(JSON_DATA["welcome_message_dm"])
+
+    async def on_member_join(self, member):
+        await member.send(JSON_DATA["welcome_message_dm"])
+
+        if success := await self.db.newMember(str(member.id)):
+            await member.add_roles(self.roles["Level 1"])
+
+    async def on_member_remove(self, member):
+        if success := await self.db.deleteMember(str(member.id)):
+            pass
 
     async def on_raw_reaction_add(self, payload):
         message_id = str(payload.message_id)
-        if message_id in self.json_data["Auto Roles"].keys():
+        if message_id in JSON_DATA["auto_roles"].keys():
             emoji_name = str(payload.emoji.name)
 
-            if emoji_name in self.json_data["Auto Roles"][message_id].keys():
-                role = discord.utils.get(
-                    payload.member.guild.roles,
-                    name=self.json_data["Auto Roles"][message_id][emoji_name],
-                )
+            if emoji_name in JSON_DATA["auto_roles"][message_id].keys():
+                role_name = JSON_DATA["auto_roles"][message_id][emoji_name]
 
-                await payload.member.add_roles(role)
+                await payload.member.add_roles(self.roles[role_name])
 
     async def on_raw_reaction_remove(self, payload):
         message_id = str(payload.message_id)
-        if message_id in self.json_data["Auto Roles"].keys():
+        if message_id in JSON_DATA["auto_roles"].keys():
             emoji_name = str(payload.emoji.name)
 
-            if emoji_name in self.json_data["Auto Roles"][message_id].keys():
-                guild = self.get_guild(payload.guild_id)
-                member = guild.get_member(payload.user_id)
-                roles = guild.roles
+            if emoji_name in JSON_DATA["auto_roles"][message_id].keys():
+                member = self.guild.get_member(payload.user_id)
 
-                role = discord.utils.get(
-                    roles, name=self.json_data["Auto Roles"][message_id][emoji_name]
-                )
+                role_name = JSON_DATA["auto_roles"][message_id][emoji_name]
 
-                await member.remove_roles(role)
+                await member.remove_roles(self.roles[role_name])
 
     async def get_context(self, message, *, cls=MyContext):
         return await super().get_context(message, cls=cls)
+
+    def get_roles_from_guild(self):
+        self.roles = {}
+        for role in self.guild.roles:
+            self.roles[role.name] = role
 
     """
     async def on_command_error(self, ctx, error):
@@ -163,7 +299,7 @@ class MyBot(commands.Bot):
     """
 
 
-bot = MyBot(command_prefix="!")
+bot = MyBot(command_prefix=JSON_DATA["prefix"])
 
 
 @bot.command(name="yardım")
@@ -190,7 +326,8 @@ async def member_info(ctx):
         )
     else:
         user = ctx.message.mentions[0]
-        await ctx.sendUserInfo(user)
+        requested_by = ctx.message.author
+        await ctx.sendUserInfo(user, requested_by)
 
 
 @bot.command(name="uptime")
@@ -211,41 +348,61 @@ async def server_info(ctx):
 
 
 @bot.command(name="duyuru")
-@commands.check(commands.is_owner())
 async def make_announcement(ctx, *, message):
-    await ctx.makeAnnouncement(message)
+    if ctx.guild.owner.id == ctx.message.author.id:
+        await ctx.makeAnnouncement(message)
 
 
 @bot.command(name="kick")
+@commands.has_permissions(kick_members=True)
 async def kick_user(ctx):
-    if ctx.message.author.guild_permissions.kick_members:
-        user = ctx.message.mentions[0]
-        user_name = user.name
+    user = ctx.message.mentions[0]
+    user_name = user.name
 
-        await user.kick()
-        await ctx.send(f"@{user_name} sunucudan atıldı!")
+    await user.kick()
+    await ctx.send(f"@{user_name} sunucudan atıldı!")
 
 
 @bot.command(name="ban")
+@commands.has_permissions(ban_members=True)
 async def ban_user(ctx):
-    if ctx.message.author.guild_permissions.ban_members:
-        user = ctx.message.mentions[0]
-        user_name = user.name
+    user = ctx.message.mentions[0]
+    user_name = user.name
 
-        await user.ban()
-        await ctx.send(f"{user_name} sunucudan yasaklandı!")
+    await user.ban()
+    await ctx.send(f"@{user.name} sunucudan yasaklandı!")
 
 
-@bot.command(name="sil")
-async def delete_messages(ctx, arg):
-    messages = await ctx.channel.history(limit=int(arg)).flatten()
+@bot.command(name="temizle")
+@commands.has_permissions(manage_messages=True)
+async def clear_messages(ctx, arg):
+    deleted = await ctx.channel.purge(limit=int(arg))
 
-    await ctx.channel.delete_messages(messages)
-    msg = await ctx.send(f"{len(messages)} mesaj silindi!")
+    msg = await ctx.send(f"{len(deleted)} mesaj temizlendi!")
 
     await asyncio.sleep(3)
     await msg.delete()
 
 
-token = "token"
+@bot.command(name="db")
+async def database_status(ctx):
+    await ctx.sendDatabaseInfo()
+
+
+@bot.command(name="slowmode")
+async def set_slowmode(ctx, delay):
+    if delay == "off":
+        delay = 0
+
+    await ctx.channel.edit(slowmode_delay = int(delay))
+
+
+"""
+async def arange(count):
+    for i in range(count):
+        yield i
+"""
+
+
+token = JSON_DATA["token"]
 bot.run(token)

@@ -1,15 +1,18 @@
 {
-"Roles": {
-        "role name": "role id (int)"
-    },
-
-"Auto Roles": {
-        "message id (str)": {
-            "emoji name": "role name"
+    "token": "token",
+    "prefix": "!",
+    "guild_id": "guild_id (int)",
+    "database_url": "restdb.io database url",
+    "database_api_key": "restdb.io database api key",
+    "auto_roles": {
+        "message_id (str)": {
+            "emoji_name": "role_name"
         },
-
-        "message id (str)": {
-            "emoji name": "role name"
+        "740987181123455773": {
+            "python_emoji": "Python"
         }
-    }
+    },
+    "help_message": "Yardım Mesajı",
+    "welcome_message_dm": "Hoş geldin!",
+    "level_up_message": "GG {name}, {level}. seviye oldun."
 }
