@@ -32,14 +32,10 @@ class RestDB:
                     return False
 
     async def newDocument(self, data: dict):
-        payload = json.dumps(data)
-
-        async with aiohttp.ClientSession() as session:
-            async with session.request("GET", self.url, params={"q": json.dumps({data["member_id"]: {"$exists": True}})}, headers=self.headers) as response:
-                if response.status == 200:
-                    exists = await response.json()
+        exists = await self.getDocument(data["member_id"])
 
         if not exists:
+            payload = json.dumps(data)
             async with aiohttp.ClientSession() as session:
                 async with session.request("POST", self.url, data=payload, headers=self.headers) as response:
                     if response.status == 201:

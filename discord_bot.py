@@ -214,7 +214,7 @@ class MyBot(commands.Bot):
         print("Her şey hazır!")
 
     async def on_message(self, message):
-        if message.author.bot:
+        if message.author.bot or message.type.name == "new_member":
             pass
 
         elif message.content.startswith("!"):
@@ -249,9 +249,7 @@ class MyBot(commands.Bot):
                 await self.db.updateMemberInfo(member_id, {"xp": member_xp, "level": member_level})
 
             else:
-                if success := await self.db.newMember(member_id):
-                    await message.author.add_roles(self.roles["Level 1"])
-                    await message.author.send(JSON_DATA["welcome_message_dm"])
+                await self.on_member_join(message.author)
 
     async def on_member_join(self, member):
         await member.send(JSON_DATA["welcome_message_dm"])
